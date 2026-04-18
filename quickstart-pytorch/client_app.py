@@ -12,12 +12,19 @@ from pytorchexample.task import train as train_fn
 app = ClientApp()
 
 
-def apply_gaussian_noise_attack(model: torch.nn.Module, noise_std: float) -> None:
-    """Adiciona ruído gaussiano nos parâmetros do modelo (model poisoning)."""
+def apply_gaussian_noise_attack(model: torch.nn.Module, noise_std: float = 1.0) -> None:
+    """Aplica o ataque de ruído gaussiano"""
     with torch.no_grad():
         for param in model.parameters():
             noise = torch.randn_like(param) * noise_std
             param.add_(noise)
+
+
+def apply_sign_flip_attack(model: torch.nn.Module, flip_factor: float = -1.0) -> None:
+    """Aplica o ataque de Sign Flip"""
+    with torch.no_grad():
+        for param in model.parameters():
+            param.mul_(flip_factor)
 
 
 @app.train()
@@ -45,22 +52,26 @@ def train(msg: Message, context: Context):
         device,
     )
 
-    # Ataque de ruído gaussiano: aplica nos primeiros `malicious-fraction` clientes
-    noise_std: float = context.run_config.get("noise-std", 0.1)
+    attack_type = context.run_config.get("attack-type", "benign")
     malicious_fraction: float = context.run_config.get("malicious-fraction", 0.0)
     num_malicious = int(num_partitions * malicious_fraction)
     is_malicious = partition_id < num_malicious
 
     if is_malicious:
-        print(f"[ATTACK] Cliente {partition_id} aplicando ruído gaussiano (std={noise_std})")
-        apply_gaussian_noise_attack(model, noise_std)
+        match attack_type:
+            case "gaussian":
+                print(f"[ATTACK] Cliente {partition_id} aplicando ruído gaussiano")
+                apply_gaussian_noise_attack(model)
+            case "flip":
+                print(f"[ATTACK] Cliente {partition_id} aplicando sign flip")
+                apply_sign_flip_attack(model)
+        
 
     # Construct and return reply Message
     model_record = ArrayRecord(model.state_dict())
     metrics = {
         "train_loss": train_loss,
-        "num-examples": len(trainloader.dataset),
-        "is_malicious": float(is_malicious),
+        "num-examples": len(trainloader.dataset)
     }
     metric_record = MetricRecord(metrics)
     content = RecordDict({"arrays": model_record, "metrics": metric_record})
