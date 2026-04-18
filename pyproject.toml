@@ -30,10 +30,8 @@ clientapp = "pytorchexample.client_app:app"
 num-server-rounds = 3
 fraction-evaluate = 0.5
 local-epochs = 1
-learning-rate = 0.1
+learning-rate = 0.01
 batch-size = 32
-# Ataque de ruído gaussiano
-# Fração de clientes maliciosos (0.0 = nenhum, 0.3 = 30%, etc.)
-malicious-fraction = 0.3
-# Desvio padrão do ruído gaussiano aplicado nos pesos
-noise-std = 0.5
+
+malicious-fraction = 0.4
+attack-type = "gaussian"
