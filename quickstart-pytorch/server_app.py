@@ -1,6 +1,7 @@
 """pytorchexample: A Flower / PyTorch app."""
 
 import torch
+import matplotlib.pyplot as plt
 from flwr.app import ArrayRecord, ConfigRecord, Context, MetricRecord
 from flwr.serverapp import Grid, ServerApp
 from flwr.serverapp.strategy import FedAvg
@@ -9,6 +10,9 @@ from pytorchexample.task import Net, load_centralized_dataset, test
 
 # Create ServerApp
 app = ServerApp()
+
+# Accumulate metrics across rounds
+_history = {"round": [], "accuracy": [], "loss": []}
 
 
 @app.main()
@@ -41,6 +45,9 @@ def main(grid: Grid, context: Context) -> None:
     state_dict = result.arrays.to_torch_state_dict()
     torch.save(state_dict, "final_model.pt")
 
+    # Plot and save learning progression
+    _plot_history(_history)
+
 
 def global_evaluate(server_round: int, arrays: ArrayRecord) -> MetricRecord:
     """Evaluate model on central data."""
@@ -57,5 +64,37 @@ def global_evaluate(server_round: int, arrays: ArrayRecord) -> MetricRecord:
     # Evaluate the global model on the test set
     test_loss, test_acc = test(model, test_dataloader, device)
 
+    # Accumulate metrics for plotting
+    _history["round"].append(server_round)
+    _history["accuracy"].append(test_acc)
+    _history["loss"].append(test_loss)
+
     # Return the evaluation metrics
     return MetricRecord({"accuracy": test_acc, "loss": test_loss})
+
+
+def _plot_history(history: dict) -> None:
+    """Plot accuracy and loss progression and save to disk."""
+    rounds = history["round"]
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    fig.suptitle("Federated Learning — Progressão do Modelo")
+
+    ax1.plot(rounds, history["accuracy"], marker="o", color="steelblue")
+    ax1.set_title("Acurácia Global")
+    ax1.set_xlabel("Round")
+    ax1.set_ylabel("Accuracy")
+    ax1.set_xticks(rounds)
+    ax1.grid(True)
+
+    ax2.plot(rounds, history["loss"], marker="o", color="tomato")
+    ax2.set_title("Loss Global")
+    ax2.set_xlabel("Round")
+    ax2.set_ylabel("Loss")
+    ax2.set_xticks(rounds)
+    ax2.grid(True)
+
+    plt.tight_layout()
+    plt.savefig("learning_progression.png", dpi=150)
+    print("Gráfico salvo em learning_progression.png")
+    plt.close(fig)
