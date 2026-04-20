@@ -1,7 +1,10 @@
 """pytorchexample: A Flower / PyTorch app."""
 
+import csv
+import os
 import torch
 import matplotlib.pyplot as plt
+from datetime import datetime
 from flwr.app import ArrayRecord, ConfigRecord, Context, MetricRecord
 from flwr.serverapp import Grid, ServerApp
 from flwr.serverapp.strategy import FedAvg
@@ -48,6 +51,11 @@ def main(grid: Grid, context: Context) -> None:
     # Plot and save learning progression
     _plot_history(_history)
 
+    # Save results to CSV for later comparison
+    attack_type = context.run_config.get("attack-type", "benign")
+    malicious_fraction = context.run_config.get("malicious-fraction", 0.0)
+    _save_results_csv(_history, attack_type, malicious_fraction)
+
 
 def global_evaluate(server_round: int, arrays: ArrayRecord) -> MetricRecord:
     """Evaluate model on central data."""
@@ -71,6 +79,21 @@ def global_evaluate(server_round: int, arrays: ArrayRecord) -> MetricRecord:
 
     # Return the evaluation metrics
     return MetricRecord({"accuracy": test_acc, "loss": test_loss})
+
+
+def _save_results_csv(history: dict, attack_type: str, malicious_fraction: float) -> None:
+    """Salva os resultados da execução em um CSV dentro da pasta results/."""
+    os.makedirs("results", exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"results/{attack_type}_frac{malicious_fraction}_{timestamp}.csv"
+
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["round", "accuracy", "loss"])
+        for r, acc, loss in zip(history["round"], history["accuracy"], history["loss"]):
+            writer.writerow([r, acc, loss])
+
+    print(f"Resultados salvos em {filename}")
 
 
 def _plot_history(history: dict) -> None:
