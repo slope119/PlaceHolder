@@ -20,11 +20,58 @@ def apply_gaussian_noise_attack(model: torch.nn.Module, noise_std: float = 1.0) 
             param.add_(noise)
 
 
-def apply_sign_flip_attack(model: torch.nn.Module, flip_factor: float = -1.0) -> None:
-    """Aplica o ataque de Sign Flip"""
+def apply_alie_attack(
+    model: torch.nn.Module,
+    global_state_dict: dict,
+    num_clients: int,
+    num_malicious: int,
+    z_max: float | None = None,
+) -> None:
+    """Aplica o ataque A Little Is Enough (ALIE) com estimativa local."""
+    from scipy.stats import norm
+
+    n, m = num_clients, num_malicious
+
+    #Define manualmente o valor de z_max. Caso não seja definido, o valor será calculado automaticamente
+    z_max = 0.8
+    if z_max is None:
+        s = max(1, (n // 2 + 1) - m)
+        # Probabilidade acumulada que define o z-score máximo "seguro"
+        p = (n - m - s) / max(n - m, 1)
+        p = min(max(p, 1e-6), 1 - 1e-6)   # clamp numérico
+        z_max = float(norm.ppf(p))
+
+    with torch.no_grad():
+        for (name, param), global_param in zip(
+            model.named_parameters(), global_state_dict.values()
+        ):
+            global_param = global_param.to(param.device)
+            mu = global_param
+            sigma = (param.data - global_param).abs()
+            param.data = mu + z_max * sigma
+
+
+def apply_sign_flip_attack(
+    model: torch.nn.Module,
+    flip_factor: float = -1.0,
+    top_fraction: float = 0.2,
+) -> None:
+    """Aplica o ataque de Sign Flip.
+
+    Se top_fraction < 1.0, inverte o sinal apenas dos pesos com maior magnitude
+    (os top_fraction% mais impactantes de cada camada), em vez de todos os pesos.
+    """
     with torch.no_grad():
         for param in model.parameters():
-            param.mul_(flip_factor)
+            if top_fraction >= 1.0:
+                # Comportamento original: inverte todos os pesos
+                param.mul_(flip_factor)
+            else:
+                flat = param.data.view(-1)
+                k = max(1, int(flat.numel() * top_fraction))
+                # Seleciona os índices dos k maiores pesos em valor absoluto
+                _, top_indices = torch.topk(flat.abs(), k)
+                flat[top_indices] *= flip_factor
 
 
 @app.train()
@@ -57,14 +104,32 @@ def train(msg: Message, context: Context):
     num_malicious = int(num_partitions * malicious_fraction)
     is_malicious = partition_id < num_malicious
 
+    # Guarda o estado global antes de qualquer ataque (usado pelo ALIE)
+    global_state_dict = {
+        k: v.clone() for k, v in msg.content["arrays"].to_torch_state_dict().items()
+    }
+
     if is_malicious:
         match attack_type:
             case "gaussian":
                 print(f"[ATTACK] Cliente {partition_id} aplicando ruído gaussiano")
                 apply_gaussian_noise_attack(model)
             case "flip":
-                print(f"[ATTACK] Cliente {partition_id} aplicando sign flip")
+                print(f"[ATTACK] Cliente {partition_id} aplicando sign flip ")
                 apply_sign_flip_attack(model)
+            case "alie":
+                z_max = context.run_config.get("alie-z-max", None)
+                print(
+                    f"[ATTACK] Cliente {partition_id} aplicando ALIE "
+                    f"(z_max={z_max if z_max is not None else 'auto'})"
+                )
+                apply_alie_attack(
+                    model,
+                    global_state_dict=global_state_dict,
+                    num_clients=num_partitions,
+                    num_malicious=num_malicious,
+                    z_max=z_max,
+                )
         
 
     # Construct and return reply Message
