@@ -60,7 +60,6 @@ def plot_comparison(filepaths: list[str], output: str) -> None:
         sys.exit(1)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
-    fig.suptitle("Comparação entre Execuções — Aprendizado Federado")
 
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 
@@ -72,15 +71,15 @@ def plot_comparison(filepaths: list[str], output: str) -> None:
         ax1.plot(data["rounds"], data["accuracy"], marker="o", label=label, color=color)
         ax2.plot(data["rounds"], data["loss"], marker="o", label=label, color=color)
 
-    ax1.set_title("Acurácia Global")
-    ax1.set_xlabel("Round")
-    ax1.set_ylabel("Accuracy")
+    ax1.set_title("Acurácia Global", fontsize=14)
+    ax1.set_xlabel("Round", fontsize=13)
+    ax1.set_ylabel("Accuracy", fontsize=13)
     ax1.legend()
     ax1.grid(True)
 
-    ax2.set_title("Loss Global")
-    ax2.set_xlabel("Round")
-    ax2.set_ylabel("Loss")
+    ax2.set_title("Loss Global", fontsize=14)
+    ax2.set_xlabel("Round", fontsize=13)
+    ax2.set_ylabel("Loss", fontsize=13)
     ax2.legend()
     ax2.grid(True)
 
