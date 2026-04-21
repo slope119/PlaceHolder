@@ -47,10 +47,10 @@ def apply_alie_attack(
         ):
             global_param = global_param.to(param.device)
             mu = global_param.mean()
-            sigma = (param.data - global_param).abs().mean()
+            sigma = global_param.std()
             low = mu - z_max * sigma
             high = mu + z_max * sigma
-            
+
             # Cria um tensor novo zerado e seleciona aleatóriamente valores entre o intervalor low e high para preenche-lo
             param.data = torch.empty_like(param.data).uniform_(low.item(), high.item())
 
