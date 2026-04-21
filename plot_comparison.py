@@ -35,22 +35,13 @@ def load_csv(filepath: str) -> dict:
 def label_from_filename(filepath: str) -> str:
     """Gera um label legível a partir do nome do arquivo CSV.
 
-    Exemplo: results/alie_frac0.4_20260420_153000.csv → alie (frac=0.4)
+    Exemplos:
+        results/ALIE.csv               → ALIE
+        results/RuídoGaussiano.csv     → RuídoGaussiano
+        results/InversãoDeSinal.csv    → InversãoDeSinal
+        results/TreinamentoBenigno.csv → TreinamentoBenigno
     """
-    basename = os.path.splitext(os.path.basename(filepath))[0]
-    parts = basename.split("_")
-
-    # Formato esperado: <attack>_frac<fraction>_<timestamp>
-    attack = parts[0]
-    frac = ""
-    for part in parts[1:]:
-        if part.startswith("frac"):
-            frac = part.replace("frac", "")
-            break
-
-    if frac:
-        return f"{attack} (frac={frac})"
-    return attack
+    return os.path.splitext(os.path.basename(filepath))[0]
 
 
 def plot_comparison(filepaths: list[str], output: str) -> None:

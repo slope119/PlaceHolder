@@ -21,19 +21,30 @@ Os clientes com os menores `partition-id`s são designados como maliciosos. Por 
 
 ## Configuração via `pyproject.toml`
 
-Os parâmetros de ataque são passados ao cliente através da seção `[tool.flwr.app.config]` do `pyproject.toml`, sendo lidos em tempo de execução via `context.run_config`. Os parâmetros relevantes são:
+Os parâmetros de ataque e agregação são passados ao cliente e ao servidor através da seção `[tool.flwr.app.config]` do `pyproject.toml`, sendo lidos em tempo de execução via `context.run_config`. Os parâmetros relevantes são:
 
-| Parâmetro | Tipo | Descrição |
-|---|---|---|
-| `attack-type` | `string` | Tipo de ataque: `"benign"`, `"gaussian"`, `"flip"` ou `"alie"` |
-| `malicious-fraction` | `float` | Fração de clientes que aplicam o ataque (ex: `0.4` = 40%) |
+| Parâmetro | Tipo | Padrão | Descrição |
+|---|---|---|---|
+| `attack-type` | `string` | `"benign"` | Tipo de ataque: `"benign"`, `"gaussian"`, `"flip"` ou `"alie"` |
+| `malicious-fraction` | `float` | `0.0` | Fração de clientes que aplicam o ataque (ex: `0.4` = 40%) |
+| `gaussian-noise-std` | `float` | `1.0` | Desvio padrão do ruído gaussiano |
+| `flip-top-fraction` | `float` | `1.0` | Fração dos maiores pesos a ter o sinal invertido no Sign Flip |
+| `alie-z-max` | `float` | auto | Z-score máximo do ALIE. Se omitido, calculado automaticamente a partir de `n` e `m` |
+| `aggregation-strategy` | `string` | `"fedavg"` | Estratégia de agregação: `"fedavg"`, `"multikrum"` ou `"fedtrimmedavg"` |
+| `multikrum-num-malicious` | `int` | `1` | Número de nós maliciosos assumido pelo MultiKrum (obrigatório se `aggregation-strategy = "multikrum"`) |
 
-Exemplo de configuração:
+Todos os parâmetros com valor padrão são opcionais — se omitidos do `pyproject.toml`, o valor padrão é usado automaticamente.
+
+Exemplo de configuração completa:
 
 ```toml
 [tool.flwr.app.config]
 attack-type = "alie"
 malicious-fraction = 0.4
+alie-z-max = 0.674
+
+aggregation-strategy = "multikrum"
+multikrum-num-malicious = 8
 ```
 
 ---
@@ -50,7 +61,7 @@ w_attack = w_local + N(0, noise_std)
 
 **Ferramenta:** `torch.randn_like` para geração do ruído com a mesma forma e dispositivo do tensor original.
 
-**Parâmetro:** `noise_std` (desvio padrão do ruído, padrão `1.0`) — configurável diretamente no código.
+**Parâmetro:** `gaussian-noise-std` — desvio padrão do ruído (padrão `1.0`). Configurável via `pyproject.toml`.
 
 ---
 
@@ -71,7 +82,7 @@ flat[top_indices] *= -1
 
 **Ferramenta:** `torch.topk` para seleção eficiente dos `k` maiores valores em valor absoluto.
 
-**Parâmetro:** `flip-top-fraction` — controla a agressividade do ataque. Valor `1.0` corresponde ao Sign Flip original; valores menores tornam o ataque mais sutil.
+**Parâmetro:** `flip-top-fraction` — controla a agressividade do ataque. Valor `1.0` corresponde ao Sign Flip original; valores menores tornam o ataque mais sutil. Configurável via `pyproject.toml`.
 
 ---
 
@@ -126,6 +137,47 @@ O `z_max` cresce com a proporção de clientes maliciosos. Exemplos com `n = 20`
 | 0.5 | 10 | ≈ 1.28 |
 
 O ataque só produz efeito positivo quando `m > n/4`. Abaixo desse limiar, o `z_max` é negativo e a perturbação empurra os pesos na direção oposta à média, com impacto mínimo.
+
+---
+
+## Script de Comparação de Execuções (`plot_comparison.py`)
+
+### Propósito
+
+Ao final de cada simulação, o servidor salva automaticamente as métricas de acurácia e loss por round em um arquivo CSV dentro da pasta `results/`. O script `plot_comparison.py` consome esses arquivos e gera um único gráfico comparativo com uma linha por execução, permitindo visualizar lado a lado o impacto de diferentes ataques sobre o treinamento federado.
+
+### Nomes dos arquivos gerados
+
+Cada execução produz um CSV com nome fixo baseado no tipo de ataque configurado:
+
+| `attack-type` | Arquivo gerado |
+|---|---|
+| `"benign"` ou `malicious-fraction = 0.0` | `results/TreinamentoBenigno.csv` |
+| `"gaussian"` | `results/RuídoGaussiano.csv` |
+| `"flip"` | `results/InversãoDeSinal.csv` |
+| `"alie"` | `results/ALIE.csv` |
+
+> **Atenção:** cada nova execução do mesmo tipo de ataque sobrescreve o CSV anterior. Isso é intencional — a pasta `results/` representa o conjunto de execuções que serão comparadas no próximo plot.
+
+### Como usar
+
+```bash
+# Plota todos os CSVs encontrados em results/ automaticamente
+python plot_comparison.py
+
+# Seleciona arquivos específicos
+python plot_comparison.py results/ALIE.csv results/TreinamentoBenigno.csv
+
+# Define o nome do arquivo de saída (padrão: comparison.pdf)
+python plot_comparison.py --output meu_grafico.pdf
+```
+
+### Como funciona
+
+1. Lê cada CSV da pasta `results/` (ou os arquivos passados como argumento)
+2. Usa o nome do arquivo (sem extensão) como label da linha no gráfico
+3. Plota dois subgráficos lado a lado: **Acurácia Global** e **Loss Global**, ambos por round
+4. Salva o resultado em PDF (formato vetorial, sem perda de qualidade)
 
 ---
 

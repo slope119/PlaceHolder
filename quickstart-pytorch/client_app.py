@@ -32,8 +32,6 @@ def apply_alie_attack(
 
     n, m = num_clients, num_malicious
 
-    #Define manualmente o valor de z_max. Caso não seja definido, o valor será calculado automaticamente
-    z_max = 0.8
     if z_max is None:
         s = max(1, (n // 2 + 1) - m)
         # Probabilidade acumulada que define o z-score máximo "seguro"
@@ -50,8 +48,8 @@ def apply_alie_attack(
             sigma = global_param.std()
             low = mu - z_max * sigma
             high = mu + z_max * sigma
-
-            # Cria um tensor novo zerado e seleciona aleatóriamente valores entre o intervalor low e high para preenche-lo
+            
+            # Cria um tensor novo zerado e seleciona aleatóriamente valores entre o intervalo low e high para preenche-lo
             param.data = torch.empty_like(param.data).uniform_(low.item(), high.item())
 
 
@@ -116,18 +114,22 @@ def train(msg: Message, context: Context):
     if is_malicious:
         match attack_type:
             case "gaussian":
-                print(f"[ATTACK] Cliente {partition_id} aplicando ruído gaussiano")
-                apply_gaussian_noise_attack(model)
+                noise_std: float = context.run_config.get("gaussian-noise-std", 1.0)
+                print(f"[ATTACK] Cliente {partition_id} aplicando ruído gaussiano (noise_std={noise_std})")
+                apply_gaussian_noise_attack(model, noise_std=noise_std)
             case "flip":
-                print(f"[ATTACK] Cliente {partition_id} aplicando sign flip ")
-                apply_sign_flip_attack(model)
+                top_fraction: float = context.run_config.get("flip-top-fraction", 1.0)
+                print(f"[ATTACK] Cliente {partition_id} aplicando sign flip (top_fraction={top_fraction})")
+                apply_sign_flip_attack(model, top_fraction=top_fraction)
             case "alie":
-                print(f"[ATTACK] Cliente {partition_id} aplicando ALIE ")
+                z_max = context.run_config.get("alie-z-max", None)
+                print(f"[ATTACK] Cliente {partition_id} aplicando ALIE (z_max={z_max if z_max is not None else 'auto'})")
                 apply_alie_attack(
                     model,
                     global_state_dict=global_state_dict,
                     num_clients=num_partitions,
                     num_malicious=num_malicious,
+                    z_max=z_max,
                 )
         
 

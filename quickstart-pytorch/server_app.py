@@ -4,10 +4,9 @@ import csv
 import os
 import torch
 import matplotlib.pyplot as plt
-from datetime import datetime
 from flwr.app import ArrayRecord, ConfigRecord, Context, MetricRecord
 from flwr.serverapp import Grid, ServerApp
-from flwr.serverapp.strategy import FedAvg, MultiKrum
+from flwr.serverapp.strategy import FedAvg, MultiKrum, FedTrimmedAvg
 
 from pytorchexample.task import Net, load_centralized_dataset, test
 
@@ -26,14 +25,25 @@ def main(grid: Grid, context: Context) -> None:
     fraction_evaluate: float = context.run_config["fraction-evaluate"]
     num_rounds: int = context.run_config["num-server-rounds"]
     lr: float = context.run_config["learning-rate"]
+    aggregation_strategy: str = context.run_config.get("aggregation-strategy", "fedavg")
 
     # Load global model
     global_model = Net()
     arrays = ArrayRecord(global_model.state_dict())
 
-    # Initialize FedAvg strategy
-    #strategy = FedAvg(fraction_evaluate=fraction_evaluate)
-    strategy = MultiKrum(fraction_evaluate=fraction_evaluate, num_malicious_nodes=8)
+    # Initialize aggregation strategy from config
+    match aggregation_strategy:
+        case "multikrum":
+            num_malicious_nodes: int = context.run_config.get("multikrum-num-malicious", 1)
+            strategy = MultiKrum(
+                fraction_evaluate=fraction_evaluate,
+                num_malicious_nodes=num_malicious_nodes,
+            )
+        case "fedtrimmedavg":
+            strategy = FedTrimmedAvg(fraction_evaluate=fraction_evaluate)
+        case _:  # "fedavg" ou qualquer valor não reconhecido
+            strategy = FedAvg(fraction_evaluate=fraction_evaluate)
+
     # Start strategy, run FedAvg for `num_rounds`
     result = strategy.start(
         grid=grid,
@@ -84,8 +94,21 @@ def global_evaluate(server_round: int, arrays: ArrayRecord) -> MetricRecord:
 def _save_results_csv(history: dict, attack_type: str, malicious_fraction: float) -> None:
     """Salva os resultados da execução em um CSV dentro da pasta results/."""
     os.makedirs("results", exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"results/{attack_type}_frac{malicious_fraction}_{timestamp}.csv"
+
+    attack_names = {
+        "benign":   "TreinamentoBenigno",
+        "gaussian": "RuídoGaussiano",
+        "flip":     "InversãoDeSinal",
+        "alie":     "ALIE",
+    }
+
+    # Se não houver clientes maliciosos, força o nome benigno independente do attack-type
+    if malicious_fraction == 0.0:
+        display_name = "TreinamentoBenigno"
+    else:
+        display_name = attack_names.get(attack_type, attack_type)
+
+    filename = f"results/{display_name}.csv"
 
     with open(filename, "w", newline="") as f:
         writer = csv.writer(f)
