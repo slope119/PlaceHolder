@@ -53,6 +53,7 @@ def plot_comparison(filepaths: list[str], output: str) -> None:
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    all_rounds = []
 
     for i, filepath in enumerate(sorted(filepaths)):
         data = load_csv(filepath)
@@ -61,16 +62,20 @@ def plot_comparison(filepaths: list[str], output: str) -> None:
 
         ax1.plot(data["rounds"], data["accuracy"], marker="o", label=label, color=color)
         ax2.plot(data["rounds"], data["loss"], marker="o", label=label, color=color)
+        all_rounds = data["rounds"]  # todos os CSVs têm os mesmos rounds
 
-    ax1.set_xlabel("Rodada", fontsize=13)
-    ax1.set_ylabel("Acurácia", fontsize=13)
-    ax1.legend()
-    ax1.grid(True)
+    even_rounds = [r for r in all_rounds if r % 2 == 0]
+    ax1.set_xticks(even_rounds)
+    ax1.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: str(int(x))))
+    ax2.set_xticks(even_rounds)
+    ax2.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: str(int(x))))
 
-    ax2.set_xlabel("Rodada", fontsize=13)
-    ax2.set_ylabel("Perda", fontsize=13)
-    ax2.legend()
-    ax2.grid(True)
+    for ax, ylabel in [(ax1, "Acurácia"), (ax2, "Perda")]:
+        ax.set_xlabel("Rodada", fontsize=16)
+        ax.set_ylabel(ylabel, fontsize=16)
+        ax.tick_params(axis="both", labelsize=14)
+        ax.legend(fontsize=13)
+        ax.grid(True)
 
     plt.tight_layout()
     plt.savefig(output, format="pdf")

@@ -36,13 +36,15 @@ learning-rate = 0.01
 batch-size = 32
 
 malicious-fraction = 0.4
-attack-type = "gaussian"
+
+# Tipo do ataque de clientes maliciosos "gaussian" | "alie" | "flip"
+attack-type = "flip"
 
 # Parâmetros dos ataques (descomente e ajuste conforme necessário)
-# gaussian-noise-std = 0.6      # desvio padrão do ruído gaussiano (padrão: 1.0)
+gaussian-noise-std = 0.6      # desvio padrão do ruído gaussiano (padrão: 1.0)
 # flip-top-fraction = 0.2       # fração dos maiores pesos a inverter no sign flip (padrão: 1.0)
-# alie-z-max = 0.674            # z-score do ALIE; se omitido, calculado automaticamente
+alie-z-max = 0.8            # z-score do ALIE; se omitido, calculado automaticamente
 
 # Estratégia de agregação: "fedavg" | "multikrum" | "fedtrimmedavg" (padrão: "fedavg")
-aggregation-strategy = "fedavg"
-# multikrum-num-malicious = 8   # obrigatório se aggregation-strategy = "multikrum"
+aggregation-strategy = "multikrum"
+multikrum-num-malicious = 8   # obrigatório se aggregation-strategy = "multikrum"
