@@ -2,7 +2,9 @@
 
 ## Visão Geral
 
-Este projeto implementa ataques Byzantine em um cenário de aprendizado federado utilizando o framework [Flower (flwr)](https://flower.ai/). Os ataques são aplicados no lado do cliente (`client_app.py`) após o treinamento local, antes do envio dos pesos ao servidor agregador.
+Este projeto implementa ataques Byzantine em um cenário de aprendizado federado utilizando o framework [Flower (flwr)](https://flower.ai/) na versão 1.29.0. Para a implementação dos ataques, a biblioteca [FL-Byzantine-Library]([https://flower.ai/](https://github.com/CRYPTO-KU/FL-Byzantine-Library)) foi utilizada como referência. Embora na biblioteca e na literatura muitos ataques sejam implementados de forma que o cliente malicioso seja "onisciente", ou seja, tenha acesso aos pesos dos modelos dos clientes benignos e do modelo global, nesse projeto os ataques foram implementados sem essa característica.
+
+Os ataques são aplicados no lado do cliente (`client_app.py`) após o treinamento local, antes do envio dos pesos ao servidor agregador.
 
 ---
 
@@ -88,7 +90,7 @@ flat[top_indices] *= -1
 
 ### 3. A Little Is Enough — ALIE (`alie`)
 
-Implementação do ataque proposto por Baruch et al. (2019), adaptado para operar sem acesso aos pesos de outros clientes (estimativa local).
+Implementação do ataque proposto por [Baruch et al. (2019)]([https://flower.ai/](https://proceedings.neurips.cc/paper/2019/file/ec1c59141046cd1866bbbcdfb6ae31d4-Paper.pdf)), adaptado para operar sem acesso aos pesos de outros clientes (estimativa local).
 
 #### Estimativas locais
 
